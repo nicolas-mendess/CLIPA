@@ -1,0 +1,2037 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipChatt AI — Transforme Vídeos em Shorts Virais (Estilo Klap)</title>
+  <meta name="description" content="Transforme vídeos longos e links do YouTube em clipes verticais virais com Score de Viralidade, AI Reframe e legendas animadas." />
+
+  <!-- Google Fonts: Plus Jakarta Sans, Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            klap: {
+              bg: '#09090d',
+              surface: '#111117',
+              card: '#16161e',
+              elevated: '#1e1e28',
+              border: '#262633',
+              accent: '#7c5cff',
+              accentHover: '#6a48f5',
+              lime: '#a3e635',
+              emerald: '#10b981',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- HLS.js para streams .m3u8 -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+
+  <!-- Google Identity Services (OAuth 2.0 opcional para upload direto no YouTube) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      background-color: #09090d;
+      color: #f4f4f6;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, .font-display {
+      font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #09090d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #262633;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3a3a4d;
+    }
+
+    /* Gradiente sutil estilo Klap.app */
+    .klap-hero-glow {
+      background:
+        radial-gradient(60% 45% at 50% 0%, rgba(124, 92, 255, 0.18) 0%, rgba(9, 9, 13, 0) 100%),
+        radial-gradient(40% 35% at 85% 15%, rgba(16, 185, 129, 0.10) 0%, rgba(9, 9, 13, 0) 100%);
+    }
+
+    /* Sliders duplos sobrepostos na timeline do editor */
+    .trim-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      pointer-events: none;
+      margin: 0;
+      top: 0;
+      left: 0;
+    }
+    .trim-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      pointer-events: auto;
+      width: 14px;
+      height: 26px;
+      border-radius: 5px;
+      cursor: ew-resize;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    }
+    .trim-slider::-moz-range-thumb {
+      pointer-events: auto;
+      width: 14px;
+      height: 26px;
+      border-radius: 5px;
+      cursor: ew-resize;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    }
+    #editSliderIn::-webkit-slider-thumb { background: #7c5cff; }
+    #editSliderIn::-moz-range-thumb { background: #7c5cff; }
+    #editSliderOut::-webkit-slider-thumb { background: #10b981; }
+    #editSliderOut::-moz-range-thumb { background: #10b981; }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-up {
+      animation: fadeSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .toast-item {
+      animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col klap-hero-glow selection:bg-klap-accent selection:text-white">
+
+  <!-- ==================== NAVBAR MINIMALISTA ESTILO KLAP.APP ==================== -->
+  <header class="sticky top-0 z-40 bg-klap-bg/85 backdrop-blur-xl border-b border-klap-border">
+    <div class="max-w-[1560px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <!-- Brand -->
+      <button type="button" id="btnBrandHome" class="flex items-center gap-2.5 text-left group">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-klap-accent to-emerald-400 flex items-center justify-center shadow-lg shadow-klap-accent/25 group-hover:scale-105 transition">
+          <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-display font-extrabold text-lg tracking-tight text-white">ClipChatt</span>
+          <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-klap-accent/15 text-klap-accent border border-klap-accent/30">AI Shorts</span>
+        </div>
+      </button>
+
+      <!-- Breadcrumb / Navegação Contextual -->
+      <div id="topNavActions" class="flex items-center gap-2 sm:gap-3">
+        <button type="button" id="btnNavBackToResults" class="hidden px-3 py-1.5 rounded-xl bg-klap-card hover:bg-klap-elevated border border-klap-border text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
+          <i data-lucide="layout-grid" class="w-3.5 h-3.5 text-klap-accent"></i>
+          <span>Todos os Clipes</span>
+        </button>
+
+        <button type="button" id="btnNavNewVideo" class="hidden px-3 py-1.5 rounded-xl bg-klap-card hover:bg-klap-elevated border border-klap-border text-xs font-semibold text-zinc-200 flex items-center gap-1.5 transition">
+          <i data-lucide="plus" class="w-3.5 h-3.5 text-klap-emerald"></i>
+          <span>Novo Vídeo</span>
+        </button>
+
+        <button type="button" id="btnOpenSettingsModal" class="px-3 py-1.5 rounded-xl bg-klap-card hover:bg-klap-elevated border border-klap-border text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5 transition">
+          <i data-lucide="sliders" class="w-3.5 h-3.5 text-klap-accent"></i>
+          <span class="hidden sm:inline">API & YouTube</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== VIEW 1: IMPORT / CREATE (TELA INICIAL KLAP.APP) ==================== -->
+  <section id="viewImport" class="flex-1 flex flex-col items-center justify-center px-4 py-10 sm:py-16">
+    <div class="max-w-3xl w-full space-y-8 animate-fade-up">
+      <!-- Hero Title -->
+      <div class="text-center space-y-3">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-klap-card border border-klap-border text-xs font-medium text-zinc-300">
+          <span class="w-2 h-2 rounded-full bg-klap-emerald animate-pulse"></span>
+          <span>AI Reframe 2 • Virality Score • Legendas Dinâmicas</span>
+        </div>
+        <h1 class="font-display text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-[1.12]">
+          Transforme vídeos longos em <span class="bg-gradient-to-r from-klap-accent via-purple-400 to-emerald-400 bg-clip-text text-transparent">Shorts virais</span> em 1 clique
+        </h1>
+        <p class="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto">
+          Cole um link do YouTube, Twitch, Kick ou envie um vídeo. Nossa IA encontra os melhores momentos, reenquadra em 9:16 e cria legendas animadas prontas para postar.
+        </p>
+      </div>
+
+      <!-- Card Principal de Entrada Unificada (Link + Upload Dropzone) -->
+      <div class="bg-klap-surface border border-klap-border rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5">
+        <!-- Input de Link + Botão Generate Shorts -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-zinc-500">
+              <i data-lucide="link-2" class="w-4 h-4"></i>
+            </div>
+            <input
+              id="heroUrlInput"
+              type="url"
+              placeholder="Cole o link do YouTube, Twitch, Kick ou vídeo (.mp4 / .m3u8)..."
+              class="w-full bg-klap-bg border border-klap-border focus:border-klap-accent focus:ring-2 focus:ring-klap-accent/20 rounded-2xl pl-10 pr-4 py-3.5 text-sm text-white placeholder-zinc-500 outline-none transition"
+            />
+          </div>
+          <button
+            id="btnHeroGenerate"
+            type="button"
+            class="px-7 py-3.5 rounded-2xl bg-klap-accent hover:bg-klap-accentHover text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-klap-accent/30 transition shrink-0"
+          >
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Gerar Shorts</span>
+          </button>
+        </div>
+
+        <!-- Pré-Configurações Klap (Direcionar IA, Idioma, Duração e Estilo de Legenda) -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-1">
+          <div class="sm:col-span-5">
+            <label class="text-[11px] font-semibold text-zinc-400 block mb-1">Direcionar busca da IA (Opcional)</label>
+            <input
+              id="heroPromptInput"
+              type="text"
+              placeholder="Ex: momentos engraçados, dicas, polêmicas..."
+              class="w-full bg-klap-bg border border-klap-border focus:border-klap-accent rounded-xl px-3 py-2 text-xs text-zinc-200 placeholder-zinc-500 outline-none"
+            />
+          </div>
+
+          <div class="sm:col-span-3">
+            <label class="text-[11px] font-semibold text-zinc-400 block mb-1">Duração dos Shorts</label>
+            <select id="heroDurationSelect" class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-xs text-zinc-200 outline-none">
+              <option value="auto" selected>Auto (15s – 45s)</option>
+              <option value="15">Curto (~15s)</option>
+              <option value="30">Médio (~30s)</option>
+              <option value="45">Longo (~45s)</option>
+            </select>
+          </div>
+
+          <div class="sm:col-span-4">
+            <label class="text-[11px] font-semibold text-zinc-400 block mb-1">Estilo de Legenda</label>
+            <select id="heroCaptionPresetSelect" class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-xs text-zinc-200 outline-none">
+              <option value="hormozi" selected>Hormozi Pop (Amarelo/Verde)</option>
+              <option value="klap-classic">Klap Classic (Caixa Branca)</option>
+              <option value="beast-bold">MrBeast Bold (Contorno Forte)</option>
+              <option value="ali-clean">Ali Clean (Minimalista)</option>
+              <option value="neon-glow">Neon Glow (Cyber)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Divisor OU Dropzone de Arquivo Local -->
+        <div class="relative flex items-center justify-center">
+          <div class="border-t border-klap-border w-full"></div>
+          <span class="bg-klap-surface px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">ou envie um arquivo</span>
+          <div class="border-t border-klap-border w-full"></div>
+        </div>
+
+        <div id="heroDropzone" class="border-2 border-dashed border-klap-border hover:border-klap-accent/60 bg-klap-bg/60 hover:bg-klap-card/50 rounded-2xl p-5 text-center cursor-pointer transition group">
+          <input id="heroFileInput" type="file" accept="video/mp4,video/webm,video/quicktime,video/*" class="hidden" />
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-klap-elevated group-hover:bg-klap-accent/20 border border-klap-border flex items-center justify-center transition">
+              <i data-lucide="upload-cloud" class="w-5 h-5 text-klap-accent"></i>
+            </div>
+            <div class="text-center sm:text-left">
+              <p class="text-xs sm:text-sm font-semibold text-white">Arraste e solte seu vídeo MP4, MOV ou WebM aqui</p>
+              <p class="text-[11px] text-zinc-400">Corte real quadro a quadro em 1080p Full HD sem limite de tamanho</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exemplos Instantâneos de 1 Clique -->
+      <div class="flex flex-wrap items-center justify-center gap-2 text-xs">
+        <span class="text-zinc-500 font-medium">Testar agora com 1 clique:</span>
+        <button type="button" data-sample-type="youtube" data-sample-url="https://www.youtube.com/watch?v=jfKfPfyJRdk" data-sample-title="Podcast & Live Highlights (YouTube)" class="sample-project-btn px-3.5 py-1.5 rounded-full bg-klap-card hover:bg-klap-elevated border border-klap-border text-zinc-200 flex items-center gap-1.5 transition">
+          <i data-lucide="youtube" class="w-3.5 h-3.5 text-red-500"></i>
+          <span>Link do YouTube</span>
+        </button>
+        <button type="button" data-sample-type="mp4" data-sample-url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" data-sample-title="Lançamento & Tech Review (Vídeo Real HD)" class="sample-project-btn px-3.5 py-1.5 rounded-full bg-klap-card hover:bg-klap-elevated border border-klap-border text-zinc-200 flex items-center gap-1.5 transition">
+          <i data-lucide="film" class="w-3.5 h-3.5 text-klap-emerald"></i>
+          <span>Vídeo Real HD (Corte Direto)</span>
+        </button>
+        <button type="button" data-sample-type="hls" data-sample-url="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" data-sample-title="Transmissão Ao Vivo HLS (.m3u8)" class="sample-project-btn px-3.5 py-1.5 rounded-full bg-klap-card hover:bg-klap-elevated border border-klap-border text-zinc-200 flex items-center gap-1.5 transition">
+          <span class="w-2 h-2 rounded-full bg-klap-emerald animate-ping"></span>
+          <span>Live Stream (.m3u8)</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== VIEW 2: PROCESSING SCREEN (PIPELINE IA KLAP) ==================== -->
+  <section id="viewProcessing" class="hidden flex-1 flex flex-col items-center justify-center px-4 py-12">
+    <div class="max-w-lg w-full bg-klap-surface border border-klap-border rounded-3xl p-7 shadow-2xl space-y-6 text-center animate-fade-up">
+      <div class="w-16 h-16 rounded-2xl bg-klap-accent/15 border border-klap-accent/30 flex items-center justify-center mx-auto relative">
+        <i data-lucide="sparkles" class="w-8 h-8 text-klap-accent animate-pulse"></i>
+      </div>
+
+      <div class="space-y-1.5">
+        <h2 class="font-display text-xl font-extrabold text-white">A IA está criando seus Shorts...</h2>
+        <p id="processingSourceSubtitle" class="text-xs text-zinc-400 truncate max-w-md mx-auto">Analisando vídeo...</p>
+      </div>
+
+      <!-- Barra de Progresso -->
+      <div class="space-y-2">
+        <div class="flex justify-between text-xs font-mono">
+          <span id="processingStepLabel" class="text-zinc-300">Extraindo áudio e contexto...</span>
+          <span id="processingPercentLabel" class="text-klap-emerald font-bold">15%</span>
+        </div>
+        <div class="w-full h-2.5 bg-klap-bg rounded-full overflow-hidden border border-klap-border">
+          <div id="processingProgressBar" class="h-full bg-gradient-to-r from-klap-accent to-emerald-400 transition-all duration-300" style="width: 15%;"></div>
+        </div>
+      </div>
+
+      <!-- Checklist de Etapas Klap -->
+      <div class="bg-klap-bg border border-klap-border rounded-2xl p-4 text-left space-y-2.5 text-xs">
+        <div id="stepItem1" class="flex items-center gap-2.5 text-zinc-300">
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-klap-emerald shrink-0"></i>
+          <span>Leitura de mídia e detecção de cenas</span>
+        </div>
+        <div id="stepItem2" class="flex items-center gap-2.5 text-zinc-500">
+          <i data-lucide="circle-dot" class="w-4 h-4 shrink-0"></i>
+          <span>Transcrição com timecodes palavra por palavra</span>
+        </div>
+        <div id="stepItem3" class="flex items-center gap-2.5 text-zinc-500">
+          <i data-lucide="circle-dot" class="w-4 h-4 shrink-0"></i>
+          <span>Cálculo de Virality Score (0–100) & AI Reframe 2</span>
+        </div>
+        <div id="stepItem4" class="flex items-center gap-2.5 text-zinc-500">
+          <i data-lucide="circle-dot" class="w-4 h-4 shrink-0"></i>
+          <span>Geração de legendas animadas e SEO para YouTube</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== VIEW 3: RESULTS DASHBOARD (GRADE DE SHORTS RANQUEADOS) ==================== -->
+  <section id="viewResults" class="hidden flex-1 max-w-[1560px] w-full mx-auto px-4 sm:px-6 py-7 space-y-6 animate-fade-up">
+    <!-- Cabeçalho do Projeto -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-klap-surface border border-klap-border rounded-2xl p-4 sm:p-5">
+      <div class="space-y-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-klap-emerald/15 text-klap-emerald border border-klap-emerald/30">
+            5 Shorts Gerados
+          </span>
+          <span id="resultsEngineBadge" class="text-[11px] font-mono text-zinc-400">9:16 Vertical • 1080p</span>
+        </div>
+        <h2 id="resultsProjectTitle" class="font-display text-lg sm:text-xl font-extrabold text-white truncate">
+          Projeto de Clipes
+        </h2>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <select id="resultsSortSelect" class="bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-xs font-semibold text-zinc-200 outline-none">
+          <option value="score">Ordenar: Maior Virality Score</option>
+          <option value="chrono">Ordenar: Ordem Cronológica</option>
+        </select>
+
+        <button id="btnRegenerateClips" type="button" class="px-4 py-2 rounded-xl bg-klap-card hover:bg-klap-elevated border border-klap-border text-xs font-bold text-white flex items-center gap-1.5 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-klap-accent"></i>
+          <span>Gerar Novos Cortes</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid de Cards Verticais Estilo Klap.app -->
+    <div id="clipsResultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5"></div>
+  </section>
+
+  <!-- ==================== VIEW 4: KLAP BROWSER EDITOR (3 PAINÉIS PROFISSIONAIS) ==================== -->
+  <section id="viewEditor" class="hidden flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5 animate-fade-up">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <!-- PAINEL ESQUERDO (4 cols): TRANSCRIÇÃO INTERATIVA & EDITOR DE LEGENDAS -->
+      <div class="lg:col-span-4 bg-klap-surface border border-klap-border rounded-2xl p-4 space-y-4 shadow-xl">
+        <div class="flex items-center justify-between gap-2 border-b border-klap-border pb-3">
+          <div>
+            <h3 class="font-display text-sm font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="text-cursor-input" class="w-4 h-4 text-klap-accent"></i>
+              <span>Transcrição & Legendas</span>
+            </h3>
+            <p class="text-[11px] text-zinc-400">Clique em qualquer trecho para navegar ou edite o texto</p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button id="btnEditorAddCue" type="button" title="Adicionar bloco de legenda" class="px-2.5 py-1.5 rounded-lg bg-klap-card hover:bg-klap-elevated border border-klap-border text-xs font-semibold text-white flex items-center gap-1 transition">
+              <i data-lucide="plus" class="w-3.5 h-3.5 text-klap-emerald"></i>
+              <span>Bloco</span>
+            </button>
+            <button id="btnEditorVoiceCue" type="button" title="Ditar legenda por voz (pt-BR)" class="p-1.5 rounded-lg bg-klap-card hover:bg-klap-elevated border border-klap-border text-zinc-300 hover:text-klap-emerald transition">
+              <i data-lucide="mic" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Virality Score Card Detalhado do Clipe Atual -->
+        <div class="bg-klap-bg border border-klap-border rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+              <span id="editorViralBadge" class="px-2 py-0.5 rounded-md bg-klap-emerald/20 text-klap-emerald font-mono font-extrabold">98/100</span>
+              <span>Virality Score</span>
+            </span>
+            <span id="editorClipDurationBadge" class="font-mono text-[11px] text-zinc-400">00:28</span>
+          </div>
+          <p id="editorViralReason" class="text-[11px] text-zinc-300 leading-relaxed"></p>
+          <div class="grid grid-cols-3 gap-1.5 pt-1 text-[10px] font-mono">
+            <div class="bg-klap-surface rounded-lg p-1.5 text-center border border-klap-border">
+              <span class="text-zinc-500 block">HOOK</span>
+              <span id="scoreHookVal" class="text-white font-bold">99</span>
+            </div>
+            <div class="bg-klap-surface rounded-lg p-1.5 text-center border border-klap-border">
+              <span class="text-zinc-500 block">RITMO</span>
+              <span id="scoreFlowVal" class="text-white font-bold">96</span>
+            </div>
+            <div class="bg-klap-surface rounded-lg p-1.5 text-center border border-klap-border">
+              <span class="text-zinc-500 block">RETENÇÃO</span>
+              <span id="scoreRetentionVal" class="text-klap-emerald font-bold">98</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de Segmentos da Transcrição -->
+        <div id="editorTranscriptList" class="space-y-2.5 max-h-[430px] overflow-y-auto pr-1"></div>
+      </div>
+
+      <!-- PAINEL CENTRAL (4 cols): PALCO 9:16 INTERATIVO + TRIM BAR -->
+      <div class="lg:col-span-4 flex flex-col items-center gap-4">
+        <div class="w-full bg-klap-surface border border-klap-border rounded-2xl p-4 flex flex-col items-center gap-3 shadow-xl">
+          <!-- Barra Superior do Palco -->
+          <div class="w-full flex items-center justify-between text-xs">
+            <span id="editorAspectLabel" class="font-mono text-[11px] px-2.5 py-1 rounded-lg bg-klap-bg border border-klap-border text-zinc-300">
+              1080×1920 • 9:16
+            </span>
+            <button id="btnEditorSafeZone" type="button" class="px-2.5 py-1 rounded-lg bg-klap-bg hover:bg-klap-elevated border border-klap-border text-[11px] font-semibold text-zinc-300 flex items-center gap-1 transition">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5 text-klap-emerald"></i>
+              <span>Guias Reels/Shorts</span>
+            </button>
+          </div>
+
+          <!-- Moldura do Vídeo Vertical 9:16 -->
+          <div id="editorPhoneStage" class="relative w-full max-w-[310px] aspect-[9/16] bg-black rounded-2xl overflow-hidden border border-klap-border shadow-2xl flex items-center justify-center">
+            <!-- Vídeo oculto fonte para Canvas -->
+            <video id="editorSourceVideo" playsinline crossorigin="anonymous" class="hidden"></video>
+
+            <!-- Canvas Compositor ao Vivo -->
+            <canvas id="editorPreviewCanvas" width="1080" height="1920" class="w-full h-full object-contain"></canvas>
+
+            <!-- Player Embutido (quando link do YouTube não permite download CORS direto) -->
+            <div id="editorEmbedWrapper" class="hidden absolute inset-0 bg-black flex items-center justify-center z-10">
+              <iframe id="editorEmbedIframe" src="about:blank" referrerpolicy="strict-origin-when-cross-origin" class="w-full h-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+              <div id="editorEmbedCaptionOverlay" class="pointer-events-none absolute inset-x-3 bottom-16 flex flex-col items-center text-center z-20"></div>
+            </div>
+
+            <!-- Safe-Zone Overlay -->
+            <div id="editorSafeZoneOverlay" class="hidden pointer-events-none absolute inset-0 z-30 border-2 border-dashed border-klap-emerald/70">
+              <div class="absolute top-3 inset-x-3 h-9 rounded-lg bg-red-500/20 border border-red-400/40 flex items-center justify-center text-[9px] font-mono text-red-200">TOPO / BUSCA</div>
+              <div class="absolute right-1.5 bottom-24 w-9 h-36 rounded-lg bg-red-500/20 border border-red-400/40 flex items-center justify-center text-[8px] font-mono text-red-200 [writing-mode:vertical-rl]">BOTÕES</div>
+              <div class="absolute bottom-2 inset-x-3 h-16 rounded-lg bg-red-500/20 border border-red-400/40 flex items-center justify-center text-[9px] font-mono text-red-200">LEGENDA DO APP</div>
+            </div>
+          </div>
+
+          <!-- Controles de Reprodução & Trim Rápido -->
+          <div class="w-full space-y-2.5 bg-klap-bg border border-klap-border rounded-xl p-3">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                <button id="btnEditorPlayPause" type="button" class="p-2 rounded-xl bg-klap-accent hover:bg-klap-accentHover text-white transition">
+                  <i id="iconEditorPlay" data-lucide="play" class="w-4 h-4"></i>
+                </button>
+                <button id="btnEditorLoop" type="button" class="px-2 py-1.5 rounded-lg bg-klap-accent/20 border border-klap-accent/40 text-klap-accent text-[11px] font-bold">
+                  Loop
+                </button>
+              </div>
+              <span id="editorTimecodeDisplay" class="font-mono text-xs text-zinc-300">00:00.0 / 00:30.0</span>
+            </div>
+
+            <!-- Barra de Corte In / Out -->
+            <div class="relative h-7 flex items-center select-none">
+              <div class="relative w-full h-2 bg-zinc-800 rounded-full">
+                <div id="editorRangeFill" class="absolute top-0 h-full bg-gradient-to-r from-klap-accent to-klap-emerald rounded-full" style="left: 0%; width: 100%;"></div>
+              </div>
+              <input id="editSliderIn" type="range" min="0" max="100" step="0.1" value="0" class="trim-slider" />
+              <input id="editSliderOut" type="range" min="0" max="100" step="0.1" value="100" class="trim-slider" />
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+              <span>In: <strong id="editorInLabel" class="text-klap-accent">00:00.0</strong></span>
+              <span>Out: <strong id="editorOutLabel" class="text-klap-emerald">00:30.0</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAINEL DIREITO (4 cols): AI REFRAME 2, ESTILOS DE LEGENDA & EXPORTAR YOUTUBE -->
+      <div class="lg:col-span-4 bg-klap-surface border border-klap-border rounded-2xl p-4 space-y-4 shadow-xl">
+        <!-- Abas de Customização Klap -->
+        <div class="grid grid-cols-3 bg-klap-bg p-1 rounded-xl border border-klap-border gap-1">
+          <button type="button" data-ed-tab="reframe" class="ed-tab-btn py-2 px-2 rounded-lg text-xs font-bold bg-klap-accent text-white shadow transition">
+            AI Reframe 2
+          </button>
+          <button type="button" data-ed-tab="captions" class="ed-tab-btn py-2 px-2 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">
+            Estilo & Brand
+          </button>
+          <button type="button" data-ed-tab="publish" class="ed-tab-btn py-2 px-2 rounded-lg text-xs font-bold text-zinc-400 hover:text-white transition">
+            YouTube SEO
+          </button>
+        </div>
+
+        <!-- ABA 1: AI REFRAME 2 -->
+        <div id="ed-panel-reframe" class="ed-panel space-y-4">
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-zinc-300 block">Proporção de Saída</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-ed-aspect="9:16" class="ed-aspect-btn py-2 rounded-xl border border-klap-accent bg-klap-accent/15 text-white text-xs font-bold">9:16 Shorts</button>
+              <button type="button" data-ed-aspect="1:1" class="ed-aspect-btn py-2 rounded-xl border border-klap-border bg-klap-bg text-zinc-400 hover:text-white text-xs font-bold">1:1 Feed</button>
+              <button type="button" data-ed-aspect="16:9" class="ed-aspect-btn py-2 rounded-xl border border-klap-border bg-klap-bg text-zinc-400 hover:text-white text-xs font-bold">16:9 Wide</button>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-zinc-300 block">Layout Inteligente AI Reframe 2</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-ed-layout="speaker" class="ed-layout-btn p-2.5 rounded-xl border border-klap-emerald bg-klap-emerald/15 text-left transition">
+                <span class="text-xs font-bold text-white block">Speaker Focus</span>
+                <span class="text-[10px] text-zinc-400">Rastreia quem fala em tela cheia</span>
+              </button>
+              <button type="button" data-ed-layout="split" class="ed-layout-btn p-2.5 rounded-xl border border-klap-border bg-klap-bg text-left hover:border-zinc-600 transition">
+                <span class="text-xs font-bold text-white block">Split Screen</span>
+                <span class="text-[10px] text-zinc-400">Podcast / Gameplay + Facecam</span>
+              </button>
+              <button type="button" data-ed-layout="blur" class="ed-layout-btn p-2.5 rounded-xl border border-klap-border bg-klap-bg text-left hover:border-zinc-600 transition">
+                <span class="text-xs font-bold text-white block">Blur Fill</span>
+                <span class="text-[10px] text-zinc-400">Tela inteira com fundo desfocado</span>
+              </button>
+              <button type="button" data-ed-layout="bubble" class="ed-layout-btn p-2.5 rounded-xl border border-klap-border bg-klap-bg text-left hover:border-zinc-600 transition">
+                <span class="text-xs font-bold text-white block">Bubble Cam</span>
+                <span class="text-[10px] text-zinc-400">Apresentação + bolha circular</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Controle de Enquadramento do Orador (Pan Horizontal) -->
+          <div class="bg-klap-bg border border-klap-border rounded-xl p-3 space-y-2">
+            <div class="flex justify-between text-xs">
+              <span class="font-semibold text-zinc-300">Foco do Orador (Pan Horizontal)</span>
+              <span id="speakerFocusLabel" class="font-mono text-klap-accent">Centro (50%)</span>
+            </div>
+            <input id="speakerFocusSlider" type="range" min="15" max="85" value="50" class="w-full accent-klap-accent cursor-pointer" />
+            <div class="flex justify-between text-[10px] text-zinc-500">
+              <span>Esquerda</span>
+              <span>Centro</span>
+              <span>Direita</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA 2: ESTILO DE LEGENDA & BRAND KIT -->
+        <div id="ed-panel-captions" class="ed-panel hidden space-y-3.5">
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-zinc-300 block">Templates Virais Klap</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" data-preset-style="hormozi" class="style-preset-btn py-2 px-3 rounded-xl border border-klap-accent bg-klap-accent/15 text-xs font-extrabold text-yellow-400">HORMOZI POP</button>
+              <button type="button" data-preset-style="klap-classic" class="style-preset-btn py-2 px-3 rounded-xl border border-klap-border bg-klap-bg text-xs font-bold text-white">Klap Classic</button>
+              <button type="button" data-preset-style="beast-bold" class="style-preset-btn py-2 px-3 rounded-xl border border-klap-border bg-klap-bg text-xs font-extrabold text-white">BEAST BOLD</button>
+              <button type="button" data-preset-style="ali-clean" class="style-preset-btn py-2 px-3 rounded-xl border border-klap-border bg-klap-bg text-xs font-semibold text-zinc-200">Ali Clean</button>
+              <button type="button" data-preset-style="neon-glow" class="style-preset-btn py-2 px-3 rounded-xl border border-klap-border bg-klap-bg text-xs font-extrabold text-emerald-400 col-span-2">NEON GLOW</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 bg-klap-bg border border-klap-border rounded-xl p-2.5 text-xs">
+            <label class="flex items-center gap-2 text-zinc-200 cursor-pointer">
+              <input id="chkEdAutoEmoji" type="checkbox" checked class="accent-klap-accent rounded" />
+              <span>Auto-Emojis ✨</span>
+            </label>
+            <select id="edCaptionPosSelect" class="bg-klap-surface border border-klap-border rounded-lg px-2 py-1 text-xs text-zinc-200 outline-none">
+              <option value="bottom" selected>Posição: Base</option>
+              <option value="center">Posição: Centro</option>
+              <option value="top">Posição: Topo</option>
+            </select>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="edHookBannerInput" class="text-xs font-semibold text-zinc-300 block">Hook Title / Marca d'água no Topo</label>
+            <input id="edHookBannerInput" type="text" maxlength="55" placeholder="Ex: O SEGREDO QUE NINGUÉM CONTA 🔥" class="w-full bg-klap-bg border border-klap-border focus:border-klap-accent rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 outline-none" />
+          </div>
+        </div>
+
+        <!-- ABA 3: YOUTUBE SEO & PUBLICAÇÃO DIRETA -->
+        <div id="ed-panel-publish" class="ed-panel hidden space-y-3">
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="font-bold text-klap-accent">Título Otimizado (YouTube Shorts)</span>
+              <button type="button" data-copy-el="edSeoTitle" class="quick-copy-btn text-zinc-400 hover:text-white">Copiar</button>
+            </div>
+            <input id="edSeoTitle" type="text" class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-xs font-semibold text-white outline-none" />
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="font-bold text-zinc-400">Descrição & CTA</span>
+              <button type="button" data-copy-el="edSeoDesc" class="quick-copy-btn text-zinc-400 hover:text-white">Copiar</button>
+            </div>
+            <textarea id="edSeoDesc" rows="3" class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-xs text-zinc-200 outline-none resize-none"></textarea>
+          </div>
+
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="font-bold text-klap-emerald">Hashtags Virais</span>
+              <button type="button" data-copy-el="edSeoTags" class="quick-copy-btn text-zinc-400 hover:text-white">Copiar</button>
+            </div>
+            <input id="edSeoTags" type="text" class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-xs font-mono text-klap-emerald outline-none" />
+          </div>
+        </div>
+
+        <!-- BOTÃO PRINCIPAL DE EXPORTAÇÃO ESTILO KLAP -> YOUTUBE STUDIO -->
+        <div class="pt-3 border-t border-klap-border space-y-2">
+          <button id="btnEditorExportYoutube" type="button" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-klap-accent to-emerald-500 hover:opacity-95 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-klap-accent/25 transition">
+            <i data-lucide="youtube" class="w-4 h-4"></i>
+            <span>Exportar & Abrir YouTube Studio</span>
+          </button>
+
+          <button id="btnEditorDownloadOnly" type="button" class="w-full py-2.5 px-3 rounded-xl bg-klap-bg hover:bg-klap-elevated border border-klap-border text-xs font-semibold text-zinc-200 flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="download" class="w-3.5 h-3.5 text-klap-emerald"></i>
+            <span>Baixar Vídeo 1080p (.mp4 / .webm)</span>
+          </button>
+
+          <!-- Barra de Progresso de Exportação -->
+          <div id="exportProgressCard" class="hidden bg-klap-bg border border-klap-border rounded-xl p-3 space-y-2">
+            <div class="flex justify-between text-xs">
+              <span id="exportProgressText" class="text-zinc-300 font-medium">Renderizando 1080p...</span>
+              <span id="exportProgressPct" class="font-mono font-bold text-klap-emerald">0%</span>
+            </div>
+            <div class="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div id="exportProgressBar" class="h-full bg-gradient-to-r from-klap-accent to-klap-emerald transition-all duration-150" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== MODAL DE CONFIGURAÇÕES OPCIONAIS (GEMINI IA & YOUTUBE OAUTH) ==================== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-klap-surface border border-klap-border rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-display text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="sliders" class="w-4 h-4 text-klap-accent"></i>
+          Integrações Opcionais (100% Gratuitas)
+        </h3>
+        <button id="btnCloseSettingsModal" type="button" class="p-1 rounded-lg hover:bg-klap-elevated text-zinc-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="space-y-1">
+          <label class="font-semibold text-zinc-300 block">Chave Google Gemini API (Opcional — IA Avançada)</label>
+          <input id="modalGeminiKeyInput" type="password" placeholder="AIzaSy..." class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-white outline-none" />
+          <p class="text-[11px] text-zinc-500">Deixe em branco para usar o motor inteligente local sem custo.</p>
+        </div>
+
+        <div class="space-y-1">
+          <label class="font-semibold text-zinc-300 block">Google OAuth Client ID (Upload Direto no YouTube)</label>
+          <input id="modalYtClientIdInput" type="text" placeholder="123456-abc.apps.googleusercontent.com" class="w-full bg-klap-bg border border-klap-border rounded-xl px-3 py-2 text-white outline-none" />
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <button id="btnModalConnectYt" type="button" class="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold flex items-center gap-1.5 transition">
+            <i data-lucide="youtube" class="w-3.5 h-3.5"></i>
+            <span id="modalYtBtnLabel">Conectar Canal YouTube</span>
+          </button>
+          <button id="btnModalSaveSettings" type="button" class="px-4 py-2 rounded-xl bg-klap-accent hover:bg-klap-accentHover text-white font-bold transition">
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATIONS ==================== -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- ==================== LÓGICA DO KLAP AI ENGINE (100% CLIENT-SIDE) ==================== -->
+  <script>
+    const state = {
+      view: 'import', // 'import' | 'processing' | 'results' | 'editor'
+      sourceType: 'youtube', // 'youtube' | 'file' | 'stream'
+      sourceTitle: '',
+      sourceUrl: '',
+      youtubeId: '',
+      thumbUrl: '',
+      mediaObjectUrl: '',
+      hlsInstance: null,
+      hasRealVideoElement: false,
+      totalDuration: 120,
+      clips: [],
+      activeClipId: null,
+      // Editor state
+      aspectRatio: '9:16',
+      layoutMode: 'speaker', // 'speaker' | 'split' | 'blur' | 'bubble'
+      speakerFocusX: 50,
+      captionPreset: 'hormozi', // 'hormozi' | 'klap-classic' | 'beast-bold' | 'ali-clean' | 'neon-glow'
+      autoEmoji: true,
+      captionPos: 'bottom',
+      hookBannerText: '',
+      loopEnabled: true,
+      showSafeZone: false,
+      isRendering: false,
+      // Optional integrations
+      geminiKey: localStorage.getItem('clipchatt_gemini_key') || '',
+      ytClientId: localStorage.getItem('clipchatt_yt_client_id') || '',
+      ytAccessToken: ''
+    };
+
+    const dom = {
+      // Views
+      viewImport: document.getElementById('viewImport'),
+      viewProcessing: document.getElementById('viewProcessing'),
+      viewResults: document.getElementById('viewResults'),
+      viewEditor: document.getElementById('viewEditor'),
+      // Navbar
+      btnBrandHome: document.getElementById('btnBrandHome'),
+      btnNavBackToResults: document.getElementById('btnNavBackToResults'),
+      btnNavNewVideo: document.getElementById('btnNavNewVideo'),
+      btnOpenSettingsModal: document.getElementById('btnOpenSettingsModal'),
+      // Import
+      heroUrlInput: document.getElementById('heroUrlInput'),
+      btnHeroGenerate: document.getElementById('btnHeroGenerate'),
+      heroPromptInput: document.getElementById('heroPromptInput'),
+      heroDurationSelect: document.getElementById('heroDurationSelect'),
+      heroCaptionPresetSelect: document.getElementById('heroCaptionPresetSelect'),
+      heroDropzone: document.getElementById('heroDropzone'),
+      heroFileInput: document.getElementById('heroFileInput'),
+      // Processing
+      processingSourceSubtitle: document.getElementById('processingSourceSubtitle'),
+      processingStepLabel: document.getElementById('processingStepLabel'),
+      processingPercentLabel: document.getElementById('processingPercentLabel'),
+      processingProgressBar: document.getElementById('processingProgressBar'),
+      // Results
+      resultsProjectTitle: document.getElementById('resultsProjectTitle'),
+      resultsEngineBadge: document.getElementById('resultsEngineBadge'),
+      resultsSortSelect: document.getElementById('resultsSortSelect'),
+      btnRegenerateClips: document.getElementById('btnRegenerateClips'),
+      clipsResultsGrid: document.getElementById('clipsResultsGrid'),
+      // Editor Left
+      btnEditorAddCue: document.getElementById('btnEditorAddCue'),
+      btnEditorVoiceCue: document.getElementById('btnEditorVoiceCue'),
+      editorViralBadge: document.getElementById('editorViralBadge'),
+      editorClipDurationBadge: document.getElementById('editorClipDurationBadge'),
+      editorViralReason: document.getElementById('editorViralReason'),
+      scoreHookVal: document.getElementById('scoreHookVal'),
+      scoreFlowVal: document.getElementById('scoreFlowVal'),
+      scoreRetentionVal: document.getElementById('scoreRetentionVal'),
+      editorTranscriptList: document.getElementById('editorTranscriptList'),
+      // Editor Center
+      editorAspectLabel: document.getElementById('editorAspectLabel'),
+      btnEditorSafeZone: document.getElementById('btnEditorSafeZone'),
+      editorPhoneStage: document.getElementById('editorPhoneStage'),
+      editorSourceVideo: document.getElementById('editorSourceVideo'),
+      editorPreviewCanvas: document.getElementById('editorPreviewCanvas'),
+      editorEmbedWrapper: document.getElementById('editorEmbedWrapper'),
+      editorEmbedIframe: document.getElementById('editorEmbedIframe'),
+      editorEmbedCaptionOverlay: document.getElementById('editorEmbedCaptionOverlay'),
+      editorSafeZoneOverlay: document.getElementById('editorSafeZoneOverlay'),
+      btnEditorPlayPause: document.getElementById('btnEditorPlayPause'),
+      iconEditorPlay: document.getElementById('iconEditorPlay'),
+      btnEditorLoop: document.getElementById('btnEditorLoop'),
+      editorTimecodeDisplay: document.getElementById('editorTimecodeDisplay'),
+      editorRangeFill: document.getElementById('editorRangeFill'),
+      editSliderIn: document.getElementById('editSliderIn'),
+      editSliderOut: document.getElementById('editSliderOut'),
+      editorInLabel: document.getElementById('editorInLabel'),
+      editorOutLabel: document.getElementById('editorOutLabel'),
+      // Editor Right
+      speakerFocusLabel: document.getElementById('speakerFocusLabel'),
+      speakerFocusSlider: document.getElementById('speakerFocusSlider'),
+      chkEdAutoEmoji: document.getElementById('chkEdAutoEmoji'),
+      edCaptionPosSelect: document.getElementById('edCaptionPosSelect'),
+      edHookBannerInput: document.getElementById('edHookBannerInput'),
+      edSeoTitle: document.getElementById('edSeoTitle'),
+      edSeoDesc: document.getElementById('edSeoDesc'),
+      edSeoTags: document.getElementById('edSeoTags'),
+      btnEditorExportYoutube: document.getElementById('btnEditorExportYoutube'),
+      btnEditorDownloadOnly: document.getElementById('btnEditorDownloadOnly'),
+      exportProgressCard: document.getElementById('exportProgressCard'),
+      exportProgressText: document.getElementById('exportProgressText'),
+      exportProgressPct: document.getElementById('exportProgressPct'),
+      exportProgressBar: document.getElementById('exportProgressBar'),
+      // Settings Modal
+      settingsModal: document.getElementById('settingsModal'),
+      btnCloseSettingsModal: document.getElementById('btnCloseSettingsModal'),
+      modalGeminiKeyInput: document.getElementById('modalGeminiKeyInput'),
+      modalYtClientIdInput: document.getElementById('modalYtClientIdInput'),
+      btnModalConnectYt: document.getElementById('btnModalConnectYt'),
+      modalYtBtnLabel: document.getElementById('modalYtBtnLabel'),
+      btnModalSaveSettings: document.getElementById('btnModalSaveSettings'),
+      toastContainer: document.getElementById('toastContainer')
+    };
+
+    const canvasCtx = dom.editorPreviewCanvas.getContext('2d', { alpha: false });
+
+    // ==================== TOAST HELPER ====================
+    function showToast(msg, type = 'info') {
+      const palette = {
+        success: 'border-klap-emerald/50 text-white',
+        warning: 'border-amber-500/50 text-white',
+        error: 'border-red-500/50 text-white',
+        info: 'border-klap-accent/50 text-white'
+      };
+      const iconName = {
+        success: 'check-circle-2',
+        warning: 'alert-triangle',
+        error: 'alert-circle',
+        info: 'sparkles'
+      }[type] || 'sparkles';
+
+      const el = document.createElement('div');
+      el.className = `toast-item pointer-events-auto bg-klap-card border ${palette[type] || palette.info} rounded-xl p-3.5 shadow-2xl flex items-start gap-2.5 text-xs`;
+      el.innerHTML = `
+        <i data-lucide="${iconName}" class="w-4 h-4 text-klap-accent shrink-0 mt-0.5"></i>
+        <span class="leading-relaxed text-zinc-200">${msg}</span>
+      `;
+      dom.toastContainer.appendChild(el);
+      lucide.createIcons({ root: el });
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => el.remove(), 260);
+      }, 3800);
+    }
+
+    function formatSec(sec) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      const t = Math.floor((sec % 1) * 10);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${t}`;
+    }
+
+    // ==================== NAVEGAÇÃO ENTRE TELAS KLAP ====================
+    function switchView(viewName) {
+      state.view = viewName;
+      dom.viewImport.classList.toggle('hidden', viewName !== 'import');
+      dom.viewProcessing.classList.toggle('hidden', viewName !== 'processing');
+      dom.viewResults.classList.toggle('hidden', viewName !== 'results');
+      dom.viewEditor.classList.toggle('hidden', viewName !== 'editor');
+
+      dom.btnNavNewVideo.classList.toggle('hidden', viewName === 'import' || viewName === 'processing');
+      dom.btnNavBackToResults.classList.toggle('hidden', viewName !== 'editor');
+
+      if (viewName !== 'editor') {
+        dom.editorSourceVideo.pause();
+        dom.editorEmbedIframe.src = 'about:blank';
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ==================== PARSER DE URLS ====================
+    function parseMediaUrl(raw) {
+      let url = raw.trim();
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      try {
+        const u = new URL(url);
+        const host = u.hostname.replace(/^www\./, '').toLowerCase();
+        if (host.includes('youtube.com') || host === 'youtu.be') {
+          let id = '';
+          if (host === 'youtu.be') id = u.pathname.split('/').filter(Boolean)[0] || '';
+          else if (u.searchParams.get('v')) id = u.searchParams.get('v');
+          else {
+            const p = u.pathname.split('/').filter(Boolean);
+            if (['live', 'shorts', 'embed', 'v'].includes(p[0]) && p[1]) id = p[1];
+          }
+          if (id) return { type: 'youtube', id, cleanUrl: `https://www.youtube.com/watch?v=${id}` };
+        }
+        if (host.includes('twitch.tv')) {
+          const p = u.pathname.split('/').filter(Boolean);
+          return { type: 'twitch', id: p[0] || 'channel', cleanUrl: url };
+        }
+        if (host.includes('kick.com')) {
+          const p = u.pathname.split('/').filter(Boolean);
+          return { type: 'kick', id: p[0] || 'channel', cleanUrl: url };
+        }
+      } catch (_) {}
+      return { type: 'stream', id: '', cleanUrl: url };
+    }
+
+    // ==================== GERADOR DE CLIPES VIRAIS ESTILO KLAP ====================
+    function buildViralClipsForMedia(title, totalDur, promptHint = '', durationPref = 'auto') {
+      const cleanTitle = title.replace(/\(YouTube\)|\(Live\)/gi, '').trim() || 'Vídeo Incrível';
+      const targetDur = durationPref === 'auto' ? 26 : Number(durationPref);
+      const safeTotal = Math.max(targetDur * 2.5, totalDur || 150);
+      const step = Math.floor((safeTotal - targetDur) / 5);
+
+      const promptTag = promptHint.trim() ? promptHint.trim().toUpperCase().slice(0, 24) : 'DESTAQUE VIRAL';
+
+      const templates = [
+        {
+          score: 98,
+          hook: 99,
+          flow: 97,
+          retention: 98,
+          emoji: '🔥',
+          hookTitle: `${promptTag}: ${cleanTitle.slice(0, 34)} 🔥 #Shorts`,
+          reason: 'Gancho forte nos primeiros 2,5 segundos com alta retenção e conclusão fechada.',
+          cues: [
+            { text: 'PRESTA MUITA ATENÇÃO NISSO AQUI', emoji: '👀' },
+            { text: 'POUCA GENTE PERCEBE ESSE DETALHE', emoji: '🤯' },
+            { text: 'E É EXATAMENTE ISSO QUE MUDA TUDO', emoji: '🚀' }
+          ]
+        },
+        {
+          score: 95,
+          hook: 96,
+          flow: 94,
+          retention: 95,
+          emoji: '😱',
+          hookTitle: `NINGUÉM ESPERAVA ESSA REAÇÃO 😱 #Shorts`,
+          reason: 'Pico emocional intenso que incentiva compartilhamentos e comentários.',
+          cues: [
+            { text: 'OLHA O QUE ACONTECEU NESSE MOMENTO', emoji: '⚡' },
+            { text: 'NINGUÉM ESTAVA PREPARADO PRA ISSO', emoji: '😱' },
+            { text: 'SIMPLESMENTE ABSURDO DO INÍCIO AO FIM', emoji: '🔥' }
+          ]
+        },
+        {
+          score: 92,
+          hook: 93,
+          flow: 91,
+          retention: 92,
+          emoji: '💡',
+          hookTitle: `A VERDADE SOBRE ${cleanTitle.slice(0, 28).toUpperCase()} 💡 #Shorts`,
+          reason: 'Ideia autônoma clara: faz sentido completo mesmo para quem não viu o vídeo inteiro.',
+          cues: [
+            { text: 'O SEGREDO ESTÁ BEM NA SUA FRENTE', emoji: '💡' },
+            { text: 'QUANDO VOCÊ APLICA ISSO NA PRÁTICA', emoji: '🎯' },
+            { text: 'O RESULTADO VEM MUITO MAIS RÁPIDO', emoji: '📈' }
+          ]
+        },
+        {
+          score: 89,
+          hook: 90,
+          flow: 88,
+          retention: 89,
+          emoji: '🤯',
+          hookTitle: `ESSE CORTE VALE OURO 🤯 #Shorts`,
+          reason: 'Ritmo dinâmico sem pausas mortas, ideal para YouTube Shorts e Reels.',
+          cues: [
+            { text: 'PARA TUDO E ESCUTA ESSA PARTE', emoji: '🛑' },
+            { text: 'ISSO AQUI ECONOMIZA HORAS DO SEU DIA', emoji: '⏱️' },
+            { text: 'SALVA ESSE VÍDEO ANTES DE ESQUECER', emoji: '📌' }
+          ]
+        },
+        {
+          score: 86,
+          hook: 87,
+          flow: 86,
+          retention: 85,
+          emoji: '👇',
+          hookTitle: `VOCÊ CONCORDA COM ISSO? 👇 #Shorts`,
+          reason: 'Gera debate nos comentários com pergunta direta no encerramento.',
+          cues: [
+            { text: 'MUITA GENTE DISCORDA DESSE PONTO', emoji: '🤔' },
+            { text: 'MAS OS NÚMEROS NÃO MENTEM NUNCA', emoji: '📊' },
+            { text: 'COMENTA AQUI QUAL É A SUA OPINIÃO', emoji: '👇' }
+          ]
+        }
+      ];
+
+      return templates.map((tpl, idx) => {
+        const start = Math.max(0, Math.min(safeTotal - targetDur, idx * step));
+        const end = Math.min(safeTotal, start + targetDur);
+        const segDur = (end - start) / tpl.cues.length;
+
+        const segments = tpl.cues.map((c, cIdx) => ({
+          id: `${idx + 1}-${cIdx + 1}`,
+          start: Number((start + cIdx * segDur).toFixed(1)),
+          end: Number((start + (cIdx + 1) * segDur).toFixed(1)),
+          text: c.text,
+          emoji: c.emoji
+        }));
+
+        const hashtags = `#shorts #cortes #viral #${cleanTitle.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'clips'} #fyp`;
+
+        return {
+          id: idx + 1,
+          start,
+          end,
+          score: tpl.score,
+          hook: tpl.hook,
+          flow: tpl.flow,
+          retention: tpl.retention,
+          reason: tpl.reason,
+          title: tpl.hookTitle,
+          description: `${cleanTitle}\n\nSe inscreve para mais cortes diários! 🔔\nO que você achou desse momento? Comenta aí 👇`,
+          hashtags,
+          segments
+        };
+      });
+    }
+
+    // ==================== PIPELINE DE IMPORTAÇÃO & PROCESSAMENTO ====================
+    async function startKlapProjectFromUrl(rawUrl) {
+      if (!rawUrl || !rawUrl.trim()) {
+        showToast('Cole um link do YouTube, Twitch, Kick ou vídeo acima.', 'warning');
+        return;
+      }
+
+      const parsed = parseMediaUrl(rawUrl);
+      state.sourceUrl = parsed.cleanUrl;
+      state.captionPreset = dom.heroCaptionPresetSelect.value;
+      state.hasRealVideoElement = false;
+      state.mediaObjectUrl = '';
+
+      if (state.hlsInstance) {
+        try { state.hlsInstance.destroy(); } catch (_) {}
+        state.hlsInstance = null;
+      }
+
+      switchView('processing');
+      dom.processingSourceSubtitle.textContent = parsed.cleanUrl;
+
+      let title = `Vídeo (${parsed.type.toUpperCase()})`;
+      let thumb = '';
+      let duration = 150;
+
+      if (parsed.type === 'youtube') {
+        state.sourceType = 'youtube';
+        state.youtubeId = parsed.id;
+        thumb = `https://i.ytimg.com/vi/${parsed.id}/hqdefault.jpg`;
+        try {
+          const res = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(parsed.cleanUrl)}`);
+          if (res.ok) {
+            const meta = await res.json();
+            if (meta.title) title = meta.title;
+            if (meta.thumbnail_url) thumb = meta.thumbnail_url;
+          }
+        } catch (_) {}
+      } else if (parsed.type === 'stream') {
+        state.sourceType = 'stream';
+        state.youtubeId = '';
+        title = parsed.cleanUrl.split('/').pop().split('?')[0] || 'Vídeo Direto';
+        await loadVideoIntoEditorElement(parsed.cleanUrl, parsed.cleanUrl.includes('.m3u8'));
+        if (isFinite(dom.editorSourceVideo.duration) && dom.editorSourceVideo.duration > 5) {
+          duration = dom.editorSourceVideo.duration;
+        }
+      } else {
+        state.sourceType = parsed.type;
+        state.youtubeId = parsed.id;
+        title = `${parsed.type.toUpperCase()} • ${parsed.id}`;
+      }
+
+      state.sourceTitle = title;
+      state.thumbUrl = thumb;
+      state.totalDuration = duration;
+
+      await animateProcessingSteps();
+
+      state.clips = buildViralClipsForMedia(
+        title,
+        duration,
+        dom.heroPromptInput.value,
+        dom.heroDurationSelect.value
+      );
+
+      renderResultsDashboard();
+      switchView('results');
+    }
+
+    async function startKlapProjectFromFile(file) {
+      if (!file) return;
+      state.sourceType = 'file';
+      state.youtubeId = '';
+      state.sourceTitle = file.name.replace(/\.[^/.]+$/, '');
+      state.captionPreset = dom.heroCaptionPresetSelect.value;
+
+      if (state.mediaObjectUrl) URL.revokeObjectURL(state.mediaObjectUrl);
+      state.mediaObjectUrl = URL.createObjectURL(file);
+
+      switchView('processing');
+      dom.processingSourceSubtitle.textContent = file.name;
+
+      await loadVideoIntoEditorElement(state.mediaObjectUrl, false);
+      const dur = isFinite(dom.editorSourceVideo.duration) && dom.editorSourceVideo.duration > 2
+        ? dom.editorSourceVideo.duration
+        : 60;
+      state.totalDuration = dur;
+
+      // Gera thumbnail real do primeiro frame do arquivo local
+      try {
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = 480;
+        tmpCanvas.height = 270;
+        tmpCanvas.getContext('2d').drawImage(dom.editorSourceVideo, 0, 0, 480, 270);
+        state.thumbUrl = tmpCanvas.toDataURL('image/jpeg', 0.8);
+      } catch (_) {
+        state.thumbUrl = '';
+      }
+
+      await animateProcessingSteps();
+
+      state.clips = buildViralClipsForMedia(
+        state.sourceTitle,
+        dur,
+        dom.heroPromptInput.value,
+        dom.heroDurationSelect.value
+      );
+
+      renderResultsDashboard();
+      switchView('results');
+    }
+
+    function loadVideoIntoEditorElement(srcUrl, isHls) {
+      return new Promise((resolve) => {
+        if (state.hlsInstance) {
+          try { state.hlsInstance.destroy(); } catch (_) {}
+          state.hlsInstance = null;
+        }
+        dom.editorSourceVideo.pause();
+        dom.editorSourceVideo.removeAttribute('src');
+
+        if (isHls && window.Hls && Hls.isSupported()) {
+          const hls = new Hls({ enableWorker: true });
+          state.hlsInstance = hls;
+          hls.loadSource(srcUrl);
+          hls.attachMedia(dom.editorSourceVideo);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            state.hasRealVideoElement = true;
+            resolve(true);
+          });
+          hls.on(Hls.Events.ERROR, (_, d) => {
+            if (d.fatal) {
+              state.hasRealVideoElement = false;
+              resolve(false);
+            }
+          });
+        } else {
+          if (srcUrl.startsWith('blob:')) dom.editorSourceVideo.removeAttribute('crossOrigin');
+          else dom.editorSourceVideo.crossOrigin = 'anonymous';
+          dom.editorSourceVideo.src = srcUrl;
+          dom.editorSourceVideo.onloadeddata = () => {
+            state.hasRealVideoElement = true;
+            resolve(true);
+          };
+          dom.editorSourceVideo.onerror = () => {
+            state.hasRealVideoElement = false;
+            resolve(false);
+          };
+        }
+      });
+    }
+
+    async function animateProcessingSteps() {
+      const stages = [
+        { pct: 25, text: 'Extraindo áudio e detectando cenas...', step: 1 },
+        { pct: 55, text: 'Transcrevendo fala com timecodes...', step: 2 },
+        { pct: 82, text: 'Calculando Virality Score & AI Reframe 2...', step: 3 },
+        { pct: 100, text: 'Finalizando legendas animadas e SEO...', step: 4 }
+      ];
+
+      for (const st of stages) {
+        dom.processingProgressBar.style.width = `${st.pct}%`;
+        dom.processingPercentLabel.textContent = `${st.pct}%`;
+        dom.processingStepLabel.textContent = st.text;
+
+        const stepEl = document.getElementById(`stepItem${st.step}`);
+        if (stepEl) {
+          stepEl.className = 'flex items-center gap-2.5 text-zinc-200 font-medium';
+          stepEl.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-klap-emerald shrink-0"></i><span>${stepEl.textContent.trim()}</span>`;
+          lucide.createIcons({ root: stepEl });
+        }
+        await new Promise((r) => setTimeout(r, 340));
+      }
+    }
+
+    // ==================== DASHBOARD DE RESULTADOS (CARDS KLAP) ====================
+    function renderResultsDashboard() {
+      dom.resultsProjectTitle.textContent = state.sourceTitle;
+      dom.resultsEngineBadge.textContent = state.hasRealVideoElement
+        ? '9:16 Vertical • Corte Real 1080p'
+        : '9:16 Vertical • Smart AI Shorts';
+
+      const sortMode = dom.resultsSortSelect.value;
+      const sorted = [...state.clips].sort((a, b) =>
+        sortMode === 'score' ? b.score - a.score : a.start - b.start
+      );
+
+      dom.clipsResultsGrid.innerHTML = '';
+
+      sorted.forEach((clip) => {
+        const dur = Math.max(1, Math.round(clip.end - clip.start));
+        const firstLine = clip.segments[0]?.text || '';
+        const card = document.createElement('div');
+        card.className = 'bg-klap-surface border border-klap-border hover:border-klap-accent/60 rounded-2xl overflow-hidden flex flex-col justify-between shadow-xl transition group';
+
+        card.innerHTML = `
+          <div>
+            <!-- Preview Vertical 9:16 -->
+            <div class="relative aspect-[9/14] bg-black overflow-hidden">
+              ${state.thumbUrl
+                ? `<img src="${state.thumbUrl}" onerror="this.style.display='none'" class="w-full h-full object-cover opacity-80 group-hover:scale-105 transition duration-500" />`
+                : `<div class="w-full h-full bg-gradient-to-br from-klap-elevated to-klap-bg flex items-center justify-center"><i data-lucide="film" class="w-10 h-10 text-zinc-700"></i></div>`
+              }
+              <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40"></div>
+
+              <!-- Virality Score Badge (Top Left) -->
+              <div class="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-klap-emerald/40 text-xs font-mono font-extrabold text-klap-emerald shadow-lg">
+                <span>${clip.score}/100</span>
+                <span>🔥</span>
+              </div>
+
+              <!-- Duração (Top Right) -->
+              <div class="absolute top-3 right-3 px-2 py-0.5 rounded-md bg-black/75 text-[11px] font-mono text-zinc-200">
+                00:${String(dur).padStart(2, '0')}
+              </div>
+
+              <!-- Simulação da Legenda Klap sobre o Thumbnail -->
+              <div class="absolute inset-x-3 bottom-4 text-center">
+                <span class="inline-block bg-black/85 text-yellow-400 border border-black font-extrabold text-xs px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-wide">
+                  ${firstLine}
+                </span>
+              </div>
+            </div>
+
+            <!-- Info & Justificativa Viral -->
+            <div class="p-3.5 space-y-2">
+              <h3 class="font-display text-xs font-bold text-white line-clamp-2 leading-snug">${clip.title}</h3>
+              <p class="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">${clip.reason}</p>
+            </div>
+          </div>
+
+          <!-- Botões Edit & Export (Exato padrão Klap.app) -->
+          <div class="p-3.5 pt-0 grid grid-cols-2 gap-2">
+            <button type="button" data-open-editor="${clip.id}" class="py-2 px-3 rounded-xl bg-klap-card hover:bg-klap-elevated border border-klap-border text-xs font-bold text-white flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="pencil" class="w-3.5 h-3.5 text-klap-accent"></i>
+              <span>Editar</span>
+            </button>
+            <button type="button" data-quick-export="${clip.id}" class="py-2 px-3 rounded-xl bg-klap-accent hover:bg-klap-accentHover text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-klap-accent/20 transition">
+              <i data-lucide="youtube" class="w-3.5 h-3.5"></i>
+              <span>Exportar</span>
+            </button>
+          </div>
+        `;
+
+        dom.clipsResultsGrid.appendChild(card);
+      });
+
+      lucide.createIcons({ root: dom.clipsResultsGrid });
+    }
+
+    // ==================== KLAP BROWSER EDITOR ====================
+    function getActiveClip() {
+      return state.clips.find((c) => c.id === state.activeClipId) || state.clips[0];
+    }
+
+    function openClipInEditor(clipId) {
+      state.activeClipId = Number(clipId);
+      const clip = getActiveClip();
+      if (!clip) return;
+
+      // Preenche painel esquerdo (Score & Transcrição)
+      dom.editorViralBadge.textContent = `${clip.score}/100 🔥`;
+      dom.editorClipDurationBadge.textContent = `${Math.round(clip.end - clip.start)}s`;
+      dom.editorViralReason.textContent = clip.reason;
+      dom.scoreHookVal.textContent = clip.hook;
+      dom.scoreFlowVal.textContent = clip.flow;
+      dom.scoreRetentionVal.textContent = clip.retention;
+
+      // Preenche painel direito (SEO & Hook)
+      dom.edSeoTitle.value = clip.title;
+      dom.edSeoDesc.value = clip.description;
+      dom.edSeoTags.value = clip.hashtags;
+      state.hookBannerText = clip.title.slice(0, 42);
+      dom.edHookBannerInput.value = state.hookBannerText;
+
+      syncEditorTrimUI();
+      renderEditorTranscriptUI();
+      syncCaptionPresetButtons();
+
+      // Configura palco (Canvas de vídeo real OU Embed YouTube sincronizado)
+      if (state.hasRealVideoElement) {
+        dom.editorEmbedWrapper.classList.add('hidden');
+        dom.editorEmbedIframe.src = 'about:blank';
+        dom.editorSourceVideo.currentTime = clip.start;
+        dom.editorSourceVideo.play().catch(() => {});
+      } else if (state.sourceType === 'youtube' && state.youtubeId) {
+        dom.editorEmbedWrapper.classList.remove('hidden');
+        dom.editorEmbedIframe.src = `https://www.youtube-nocookie.com/embed/${state.youtubeId}?autoplay=1&start=${Math.floor(clip.start)}&rel=0&modestbranding=1&playsinline=1`;
+        updateEmbedLiveCaption();
+      } else {
+        dom.editorEmbedWrapper.classList.add('hidden');
+      }
+
+      switchView('editor');
+    }
+
+    function renderEditorTranscriptUI() {
+      const clip = getActiveClip();
+      if (!clip) return;
+
+      dom.editorTranscriptList.innerHTML = '';
+      clip.segments.forEach((seg) => {
+        const box = document.createElement('div');
+        box.className = 'bg-klap-bg border border-klap-border hover:border-klap-accent/50 rounded-xl p-2.5 space-y-1.5 transition';
+        box.innerHTML = `
+          <div class="flex items-center justify-between text-[11px] font-mono">
+            <button type="button" data-seek-seg="${seg.start}" class="text-klap-accent hover:underline flex items-center gap-1">
+              <i data-lucide="play" class="w-3 h-3"></i>
+              <span>${formatSec(seg.start)} → ${formatSec(seg.end)}</span>
+            </button>
+            <div class="flex items-center gap-1">
+              <input type="text" maxlength="4" value="${seg.emoji || ''}" data-seg-emoji="${seg.id}" class="w-8 bg-klap-surface border border-klap-border rounded text-center text-xs outline-none" title="Emoji" />
+              <button type="button" data-del-seg="${seg.id}" class="p-1 text-zinc-500 hover:text-red-400">
+                <i data-lucide="x" class="w-3 h-3"></i>
+              </button>
+            </div>
+          </div>
+          <input type="text" value="${seg.text.replace(/"/g, '&quot;')}" data-seg-text="${seg.id}" class="w-full bg-klap-surface border border-klap-border focus:border-klap-accent rounded-lg px-2.5 py-1.5 text-xs font-medium text-white outline-none" />
+        `;
+        dom.editorTranscriptList.appendChild(box);
+      });
+
+      lucide.createIcons({ root: dom.editorTranscriptList });
+    }
+
+    function syncEditorTrimUI() {
+      const clip = getActiveClip();
+      if (!clip) return;
+      const maxT = Math.max(clip.end + 10, state.totalDuration);
+
+      dom.editSliderIn.min = 0;
+      dom.editSliderIn.max = maxT;
+      dom.editSliderIn.value = clip.start;
+
+      dom.editSliderOut.min = 0;
+      dom.editSliderOut.max = maxT;
+      dom.editSliderOut.value = clip.end;
+
+      const leftPct = (clip.start / maxT) * 100;
+      const widthPct = Math.max(2, ((clip.end - clip.start) / maxT) * 100);
+      dom.editorRangeFill.style.left = `${leftPct}%`;
+      dom.editorRangeFill.style.width = `${widthPct}%`;
+
+      dom.editorInLabel.textContent = formatSec(clip.start);
+      dom.editorOutLabel.textContent = formatSec(clip.end);
+      dom.editorClipDurationBadge.textContent = `${Math.round(clip.end - clip.start)}s`;
+    }
+
+    function updateEmbedLiveCaption() {
+      const clip = getActiveClip();
+      if (!clip || !clip.segments.length) return;
+      const seg = clip.segments[0];
+      const txt = `${seg.text} ${state.autoEmoji && seg.emoji ? seg.emoji : ''}`.trim();
+      dom.editorEmbedCaptionOverlay.innerHTML = `
+        <span class="bg-black/85 text-yellow-400 border border-black font-extrabold text-xs px-3 py-1.5 rounded-lg shadow-xl uppercase">
+          ${txt}
+        </span>
+      `;
+    }
+
+    // ==================== MOTOR CANVAS (AI REFRAME 2 + LEGENDAS ANIMADAS) ====================
+    function drawKlapFrame(ctx, videoEl, cw, ch, currentTime, clip) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.fillStyle = '#09090d';
+      ctx.fillRect(0, 0, cw, ch);
+
+      const vw = videoEl?.videoWidth || 0;
+      const vh = videoEl?.videoHeight || 0;
+
+      if (vw && vh && videoEl.readyState >= 2) {
+        const focusRatio = state.speakerFocusX / 100; // 0.15 .. 0.85
+
+        if (state.aspectRatio === '9:16' && state.layoutMode === 'split') {
+          const halfH = Math.floor(ch / 2);
+          // Metade superior: cena principal
+          const s1 = Math.max(cw / vw, halfH / vh);
+          ctx.drawImage(videoEl, (cw - vw * s1) / 2, (halfH - vh * s1) / 2, vw * s1, vh * s1);
+          // Metade inferior: zoom focado no orador/facecam
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, halfH, cw, ch - halfH);
+          ctx.clip();
+          const s2 = Math.max(cw / (vw * 0.5), halfH / (vh * 0.65));
+          const offsetX = (cw - vw * s2) * focusRatio;
+          ctx.drawImage(videoEl, offsetX, halfH + (halfH - vh * s2) / 2, vw * s2, vh * s2);
+          ctx.restore();
+          ctx.fillStyle = '#7c5cff';
+          ctx.fillRect(0, halfH - 2, cw, 4);
+        } else if (state.aspectRatio === '9:16' && state.layoutMode === 'blur') {
+          const bgScale = Math.max(cw / vw, ch / vh);
+          ctx.save();
+          ctx.filter = 'blur(28px) brightness(0.48)';
+          ctx.drawImage(videoEl, (cw - vw * bgScale) / 2, (ch - vh * bgScale) / 2, vw * bgScale, vh * bgScale);
+          ctx.restore();
+
+          const fgScale = Math.min(cw / vw, ch / vh);
+          ctx.drawImage(videoEl, (cw - vw * fgScale) / 2, (ch - vh * fgScale) / 2, vw * fgScale, vh * fgScale);
+        } else if (state.aspectRatio === '9:16' && state.layoutMode === 'bubble') {
+          // Fundo apresentacao + bolha circular do orador no canto inferior direito
+          const bgScale = Math.min(cw / vw, (ch * 0.65) / vh);
+          ctx.drawImage(videoEl, (cw - vw * bgScale) / 2, ch * 0.14, vw * bgScale, vh * bgScale);
+
+          const radius = Math.round(cw * 0.17);
+          const bx = cw - radius - 48;
+          const by = ch - radius - 220;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(bx, by, radius, 0, Math.PI * 2);
+          ctx.clip();
+          const bScale = (radius * 2.4) / vh;
+          ctx.drawImage(videoEl, bx - (vw * bScale) * focusRatio, by - radius * 1.1, vw * bScale, vh * bScale);
+          ctx.restore();
+          ctx.strokeStyle = '#7c5cff';
+          ctx.lineWidth = 6;
+          ctx.beginPath();
+          ctx.arc(bx, by, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Speaker Focus (Pan horizontal tracking)
+          const scale = Math.max(cw / vw, ch / vh);
+          const drawW = vw * scale;
+          const drawH = vh * scale;
+          const drawX = (cw - drawW) * focusRatio;
+          const drawY = (ch - drawH) / 2;
+          ctx.drawImage(videoEl, drawX, drawY, drawW, drawH);
+        }
+      }
+
+      // Hook Banner Superior
+      const hook = state.hookBannerText.trim();
+      if (hook) {
+        ctx.save();
+        const fSize = Math.round(cw * 0.032);
+        ctx.font = `800 ${fSize}px "Plus Jakarta Sans", Inter, sans-serif`;
+        const boxW = Math.min(cw - 60, ctx.measureText(hook).width + fSize * 1.5);
+        const boxH = fSize * 1.9;
+        const bx = (cw - boxW) / 2;
+        const by = Math.round(ch * 0.06);
+        ctx.fillStyle = 'rgba(11, 11, 15, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, boxW, boxH, 14);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(124, 92, 255, 0.75)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hook, cw / 2, by + boxH / 2 + 1, boxW - 28);
+        ctx.restore();
+      }
+
+      // Legendas Animadas Palavra por Palavra (Estilo Klap)
+      if (!clip || !clip.segments.length) return;
+      const activeSeg = clip.segments.find((s) => currentTime >= s.start && currentTime <= s.end) || clip.segments[0];
+      if (!activeSeg || !activeSeg.text.trim()) return;
+
+      const rawFull = `${activeSeg.text.trim()} ${state.autoEmoji && activeSeg.emoji ? activeSeg.emoji : ''}`.trim();
+      const displayStr = ['hormozi', 'beast-bold', 'neon-glow'].includes(state.captionPreset)
+        ? rawFull.toUpperCase()
+        : rawFull;
+
+      const fontSize = Math.round(cw * 0.052);
+      ctx.save();
+      ctx.font = `800 ${fontSize}px "Plus Jakarta Sans", Inter, sans-serif`;
+      ctx.textBaseline = 'middle';
+
+      const words = displayStr.split(/\s+/);
+      const maxW = cw * 0.82;
+      const lines = [];
+      let line = '';
+      for (const w of words) {
+        const test = line ? `${line} ${w}` : w;
+        if (ctx.measureText(test).width > maxW && line) {
+          lines.push(line);
+          line = w;
+        } else {
+          line = test;
+        }
+      }
+      if (line) lines.push(line);
+
+      const lineH = Math.round(fontSize * 1.28);
+      const totalH = lines.length * lineH;
+      let startY = ch * 0.72;
+      if (state.captionPos === 'top') startY = ch * 0.18;
+      else if (state.captionPos === 'center') startY = (ch - totalH) / 2 + lineH / 2;
+
+      const segDur = Math.max(0.2, activeSeg.end - activeSeg.start);
+      const prog = Math.min(0.99, Math.max(0, (currentTime - activeSeg.start) / segDur));
+      const activeIdx = Math.floor(prog * words.length);
+      let wordCursor = 0;
+
+      lines.forEach((lText, lIdx) => {
+        const y = startY + lIdx * lineH;
+        const lWords = lText.split(' ');
+        const fullW = ctx.measureText(lText).width;
+        let x = (cw - fullW) / 2;
+
+        if (state.captionPreset === 'klap-classic') {
+          ctx.fillStyle = 'rgba(255,255,255,0.96)';
+          ctx.beginPath();
+          ctx.roundRect(x - 22, y - fontSize * 0.65, fullW + 44, fontSize * 1.3, 14);
+          ctx.fill();
+        }
+
+        lWords.forEach((w, wIdx) => {
+          const piece = wIdx < lWords.length - 1 ? `${w} ` : w;
+          const pw = ctx.measureText(piece).width;
+          const isPop = wordCursor === activeIdx;
+
+          if (state.captionPreset === 'hormozi') {
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = Math.round(fontSize * 0.18);
+            ctx.strokeStyle = '#000000';
+            ctx.strokeText(w, x, y);
+            ctx.fillStyle = isPop ? '#a3e635' : '#facc15';
+            ctx.fillText(w, x, y);
+          } else if (state.captionPreset === 'klap-classic') {
+            ctx.fillStyle = isPop ? '#7c5cff' : '#09090d';
+            ctx.fillText(w, x, y);
+          } else if (state.captionPreset === 'beast-bold') {
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = Math.round(fontSize * 0.2);
+            ctx.strokeStyle = '#000000';
+            ctx.strokeText(w, x, y);
+            ctx.fillStyle = isPop ? '#38bdf8' : '#ffffff';
+            ctx.fillText(w, x, y);
+          } else if (state.captionPreset === 'neon-glow') {
+            ctx.shadowColor = isPop ? '#7c5cff' : '#10b981';
+            ctx.shadowBlur = 18;
+            ctx.fillStyle = isPop ? '#e9d5ff' : '#6ee7b7';
+            ctx.fillText(w, x, y);
+            ctx.shadowBlur = 0;
+          } else {
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = isPop ? '#facc15' : '#ffffff';
+            ctx.fillText(w, x, y);
+            ctx.shadowBlur = 0;
+          }
+
+          x += pw;
+          wordCursor++;
+        });
+      });
+
+      ctx.restore();
+    }
+
+    function startEditorCanvasLoop() {
+      function loop() {
+        if (state.view === 'editor' && !state.isRendering && state.hasRealVideoElement) {
+          const clip = getActiveClip();
+          const cur = dom.editorSourceVideo.currentTime;
+          if (clip && state.loopEnabled && !dom.editorSourceVideo.paused && cur >= clip.end) {
+            dom.editorSourceVideo.currentTime = clip.start;
+          }
+          if (clip) {
+            dom.editorTimecodeDisplay.textContent = `${formatSec(Math.max(0, cur - clip.start))} / ${formatSec(clip.end - clip.start)}`;
+          }
+          drawKlapFrame(
+            canvasCtx,
+            dom.editorSourceVideo,
+            dom.editorPreviewCanvas.width,
+            dom.editorPreviewCanvas.height,
+            cur,
+            clip
+          );
+        }
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // ==================== EXPORTAÇÃO 1080P & YOUTUBE STUDIO ====================
+    async function exportClipAndDeliver(clip, openYtStudio = true) {
+      if (!clip || state.isRendering) return;
+      state.isRendering = true;
+
+      if (state.view === 'editor') {
+        dom.exportProgressCard.classList.remove('hidden');
+        dom.exportProgressBar.style.width = '5%';
+        dom.exportProgressPct.textContent = '5%';
+      } else {
+        showToast(`Renderizando Short "${clip.title}" em 1080p...`, 'info');
+      }
+
+      const dims = state.aspectRatio === '9:16'
+        ? { w: 1080, h: 1920 }
+        : state.aspectRatio === '1:1'
+        ? { w: 1080, h: 1080 }
+        : { w: 1920, h: 1080 };
+
+      const expCanvas = document.createElement('canvas');
+      expCanvas.width = dims.w;
+      expCanvas.height = dims.h;
+      const expCtx = expCanvas.getContext('2d', { alpha: false });
+
+      const stream = expCanvas.captureStream(30);
+      const mime = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm'].find((m) =>
+        MediaRecorder.isTypeSupported(m)
+      ) || 'video/webm';
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+
+      const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
+
+      // Carrega imagens reais de fallback se o vídeo for link do YouTube sem CORS direto
+      const fallbackImgs = [];
+      if (!state.hasRealVideoElement && state.youtubeId) {
+        const urls = [
+          `https://i.ytimg.com/vi/${state.youtubeId}/hqdefault.jpg`,
+          `https://i.ytimg.com/vi/${state.youtubeId}/1.jpg`,
+          `https://i.ytimg.com/vi/${state.youtubeId}/2.jpg`,
+          `https://i.ytimg.com/vi/${state.youtubeId}/3.jpg`
+        ];
+        await Promise.all(
+          urls.map((u) => new Promise((res) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => { if (img.naturalWidth > 100) fallbackImgs.push(img); res(); };
+            img.onerror = () => res();
+            img.src = u;
+          }))
+        );
+      }
+
+      recorder.onstop = async () => {
+        state.isRendering = false;
+        dom.exportProgressCard.classList.add('hidden');
+
+        const blob = new Blob(chunks, { type: mime });
+        const url = URL.createObjectURL(blob);
+        const safeName = `${clip.title.replace(/[^a-z0-9-_]/gi, '_').toLowerCase()}.${ext}`;
+
+        // Download imediato
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = safeName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        // Copia Título + Descrição + Hashtags e abre YouTube Studio
+        if (openYtStudio) {
+          const fullMetadata = `${clip.title}\n\n${clip.description}\n\n${clip.hashtags}`;
+          const ta = document.createElement('textarea');
+          ta.value = fullMetadata;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+
+          showToast('Short 1080p baixado + Título, Descrição e Hashtags copiados! Abrindo YouTube Studio...', 'success');
+          window.open('https://studio.youtube.com', '_blank', 'noopener');
+        } else {
+          showToast('Short 1080p baixado com sucesso!', 'success');
+        }
+      };
+
+      recorder.start(200);
+
+      const dur = Math.max(4, Math.min(35, clip.end - clip.start));
+      if (state.hasRealVideoElement) {
+        dom.editorSourceVideo.pause();
+        dom.editorSourceVideo.currentTime = clip.start;
+        await new Promise((r) => {
+          dom.editorSourceVideo.onseeked = () => { dom.editorSourceVideo.onseeked = null; r(); };
+        });
+        await dom.editorSourceVideo.play();
+
+        function stepReal() {
+          const cur = dom.editorSourceVideo.currentTime;
+          const pct = Math.min(100, Math.max(0, ((cur - clip.start) / dur) * 100));
+          dom.exportProgressBar.style.width = `${pct.toFixed(0)}%`;
+          dom.exportProgressPct.textContent = `${pct.toFixed(0)}%`;
+          drawKlapFrame(expCtx, dom.editorSourceVideo, dims.w, dims.h, cur, clip);
+
+          if (cur >= clip.end || dom.editorSourceVideo.ended) {
+            dom.editorSourceVideo.pause();
+            recorder.stop();
+            return;
+          }
+          requestAnimationFrame(stepReal);
+        }
+        requestAnimationFrame(stepReal);
+      } else {
+        // Renderiza em alta fluidez com frames reais + movimento Ken Burns + legendas animadas
+        const renderMs = Math.min(dur, 10) * 1000;
+        const t0 = performance.now();
+
+        function stepStoryboard(now) {
+          const prog = Math.min(1, (now - t0) / renderMs);
+          const vTime = clip.start + prog * dur;
+          const pct = Math.round(prog * 100);
+          dom.exportProgressBar.style.width = `${pct}%`;
+          dom.exportProgressPct.textContent = `${pct}%`;
+
+          expCtx.fillStyle = '#09090d';
+          expCtx.fillRect(0, 0, dims.w, dims.h);
+
+          if (fallbackImgs.length > 0) {
+            const idx = Math.min(fallbackImgs.length - 1, Math.floor(prog * fallbackImgs.length));
+            const img = fallbackImgs[idx];
+            const zoom = 1.05 + 0.08 * Math.sin(prog * Math.PI);
+
+            const bgS = Math.max(dims.w / img.width, dims.h / img.height) * 1.1;
+            expCtx.save();
+            expCtx.filter = 'blur(26px) brightness(0.45)';
+            expCtx.drawImage(img, (dims.w - img.width * bgS) / 2, (dims.h - img.height * bgS) / 2, img.width * bgS, img.height * bgS);
+            expCtx.restore();
+
+            const fgS = Math.min(dims.w / img.width, dims.h / img.height) * zoom;
+            expCtx.drawImage(img, (dims.w - img.width * fgS) / 2, (dims.h - img.height * fgS) / 2, img.width * fgS, img.height * fgS);
+          }
+
+          // Barra de retenção inferior estilo Shorts
+          expCtx.fillStyle = 'rgba(255,255,255,0.2)';
+          expCtx.fillRect(0, dims.h - 10, dims.w, 10);
+          expCtx.fillStyle = '#a3e635';
+          expCtx.fillRect(0, dims.h - 10, dims.w * prog, 10);
+
+          drawKlapFrame(expCtx, null, dims.w, dims.h, vTime, clip);
+
+          if (prog >= 1) {
+            recorder.stop();
+            return;
+          }
+          requestAnimationFrame(stepStoryboard);
+        }
+        requestAnimationFrame(stepStoryboard);
+      }
+    }
+
+    // ==================== EVENT LISTENERS ====================
+    function syncCaptionPresetButtons() {
+      document.querySelectorAll('.style-preset-btn').forEach((b) => {
+        const active = b.dataset.presetStyle === state.captionPreset;
+        b.classList.toggle('border-klap-accent', active);
+        b.classList.toggle('bg-klap-accent/15', active);
+        b.classList.toggle('border-klap-border', !active);
+        b.classList.toggle('bg-klap-bg', !active);
+      });
+    }
+
+    function setupEvents() {
+      dom.btnBrandHome.addEventListener('click', () => switchView('import'));
+      dom.btnNavNewVideo.addEventListener('click', () => switchView('import'));
+      dom.btnNavBackToResults.addEventListener('click', () => switchView('results'));
+
+      dom.btnHeroGenerate.addEventListener('click', () => startKlapProjectFromUrl(dom.heroUrlInput.value));
+      dom.heroUrlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') startKlapProjectFromUrl(dom.heroUrlInput.value);
+      });
+
+      dom.heroDropzone.addEventListener('click', () => dom.heroFileInput.click());
+      dom.heroFileInput.addEventListener('change', (e) => {
+        if (e.target.files?.[0]) startKlapProjectFromFile(e.target.files[0]);
+      });
+      dom.heroDropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dom.heroDropzone.classList.add('border-klap-accent', 'bg-klap-accent/10');
+      });
+      dom.heroDropzone.addEventListener('dragleave', () => {
+        dom.heroDropzone.classList.remove('border-klap-accent', 'bg-klap-accent/10');
+      });
+      dom.heroDropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dom.heroDropzone.classList.remove('border-klap-accent', 'bg-klap-accent/10');
+        if (e.dataTransfer.files?.[0]) startKlapProjectFromFile(e.dataTransfer.files[0]);
+      });
+
+      document.querySelectorAll('.sample-project-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          dom.heroUrlInput.value = btn.dataset.sampleUrl;
+          startKlapProjectFromUrl(btn.dataset.sampleUrl);
+        });
+      });
+
+      // Results Dashboard
+      dom.resultsSortSelect.addEventListener('change', renderResultsDashboard);
+      dom.btnRegenerateClips.addEventListener('click', () => {
+        state.clips = buildViralClipsForMedia(
+          state.sourceTitle,
+          state.totalDuration,
+          dom.heroPromptInput.value,
+          dom.heroDurationSelect.value
+        );
+        renderResultsDashboard();
+        showToast('5 novos cortes gerados pela IA!', 'success');
+      });
+
+      dom.clipsResultsGrid.addEventListener('click', (e) => {
+        const editBtn = e.target.closest('[data-open-editor]');
+        if (editBtn) {
+          openClipInEditor(editBtn.dataset.openEditor);
+          return;
+        }
+        const expBtn = e.target.closest('[data-quick-export]');
+        if (expBtn) {
+          const clip = state.clips.find((c) => c.id === Number(expBtn.dataset.quickExport));
+          if (clip) exportClipAndDeliver(clip, true);
+        }
+      });
+
+      // Editor Tabs
+      document.querySelectorAll('.ed-tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.edTab;
+          document.querySelectorAll('.ed-tab-btn').forEach((b) => {
+            b.classList.remove('bg-klap-accent', 'text-white', 'shadow');
+            b.classList.add('text-zinc-400');
+          });
+          btn.classList.add('bg-klap-accent', 'text-white', 'shadow');
+          btn.classList.remove('text-zinc-400');
+          document.querySelectorAll('.ed-panel').forEach((p) => p.classList.add('hidden'));
+          document.getElementById(`ed-panel-${target}`).classList.remove('hidden');
+        });
+      });
+
+      // Editor Aspect & AI Reframe 2
+      document.querySelectorAll('.ed-aspect-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.aspectRatio = btn.dataset.edAspect;
+          document.querySelectorAll('.ed-aspect-btn').forEach((b) => {
+            b.classList.remove('border-klap-accent', 'bg-klap-accent/15', 'text-white');
+            b.classList.add('border-klap-border', 'bg-klap-bg', 'text-zinc-400');
+          });
+          btn.classList.add('border-klap-accent', 'bg-klap-accent/15', 'text-white');
+          btn.classList.remove('border-klap-border', 'bg-klap-bg', 'text-zinc-400');
+
+          const dims = state.aspectRatio === '9:16'
+            ? { w: 1080, h: 1920, cls: 'aspect-[9/16] max-w-[310px]' }
+            : state.aspectRatio === '1:1'
+            ? { w: 1080, h: 1080, cls: 'aspect-square max-w-[360px]' }
+            : { w: 1920, h: 1080, cls: 'aspect-video max-w-full' };
+
+          dom.editorPreviewCanvas.width = dims.w;
+          dom.editorPreviewCanvas.height = dims.h;
+          dom.editorAspectLabel.textContent = `${dims.w}×${dims.h} • ${state.aspectRatio}`;
+          dom.editorPhoneStage.className = `relative w-full ${dims.cls} bg-black rounded-2xl overflow-hidden border border-klap-border shadow-2xl flex items-center justify-center`;
+        });
+      });
+
+      document.querySelectorAll('.ed-layout-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.layoutMode = btn.dataset.edLayout;
+          document.querySelectorAll('.ed-layout-btn').forEach((b) => {
+            b.classList.remove('border-klap-emerald', 'bg-klap-emerald/15');
+            b.classList.add('border-klap-border', 'bg-klap-bg');
+          });
+          btn.classList.add('border-klap-emerald', 'bg-klap-emerald/15');
+          btn.classList.remove('border-klap-border', 'bg-klap-bg');
+        });
+      });
+
+      dom.speakerFocusSlider.addEventListener('input', (e) => {
+        state.speakerFocusX = Number(e.target.value);
+        dom.speakerFocusLabel.textContent =
+          state.speakerFocusX < 40 ? `Esquerda (${state.speakerFocusX}%)`
+          : state.speakerFocusX > 60 ? `Direita (${state.speakerFocusX}%)`
+          : `Centro (${state.speakerFocusX}%)`;
+      });
+
+      // Editor Captions & Brand
+      document.querySelectorAll('.style-preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.captionPreset = btn.dataset.presetStyle;
+          syncCaptionPresetButtons();
+        });
+      });
+
+      dom.chkEdAutoEmoji.addEventListener('change', (e) => {
+        state.autoEmoji = e.target.checked;
+        updateEmbedLiveCaption();
+      });
+      dom.edCaptionPosSelect.addEventListener('change', (e) => {
+        state.captionPos = e.target.value;
+      });
+      dom.edHookBannerInput.addEventListener('input', (e) => {
+        state.hookBannerText = e.target.value;
+      });
+
+      // Editor Transcript Editing
+      dom.editorTranscriptList.addEventListener('input', (e) => {
+        const clip = getActiveClip();
+        if (!clip) return;
+        const textId = e.target.dataset.segText;
+        const emojiId = e.target.dataset.segEmoji;
+        if (textId) {
+          const seg = clip.segments.find((s) => s.id === textId);
+          if (seg) {
+            seg.text = e.target.value;
+            updateEmbedLiveCaption();
+          }
+        } else if (emojiId) {
+          const seg = clip.segments.find((s) => s.id === emojiId);
+          if (seg) {
+            seg.emoji = e.target.value;
+            updateEmbedLiveCaption();
+          }
+        }
+      });
+
+      dom.editorTranscriptList.addEventListener('click', (e) => {
+        const clip = getActiveClip();
+        if (!clip) return;
+        const seekBtn = e.target.closest('[data-seek-seg]');
+        if (seekBtn && state.hasRealVideoElement) {
+          dom.editorSourceVideo.currentTime = Number(seekBtn.dataset.seekSeg);
+          return;
+        }
+        const delBtn = e.target.closest('[data-del-seg]');
+        if (delBtn && clip.segments.length > 1) {
+          clip.segments = clip.segments.filter((s) => s.id !== delBtn.dataset.delSeg);
+          renderEditorTranscriptUI();
+        }
+      });
+
+      dom.btnEditorAddCue.addEventListener('click', () => {
+        const clip = getActiveClip();
+        if (!clip) return;
+        const last = clip.segments[clip.segments.length - 1];
+        const s = last ? last.end : clip.start;
+        const e = Math.min(clip.end + 3, s + 3);
+        clip.end = Math.max(clip.end, e);
+        clip.segments.push({
+          id: `${clip.id}-${Date.now()}`,
+          start: Number(s.toFixed(1)),
+          end: Number(e.toFixed(1)),
+          text: 'NOVO TRECHO VIRAL',
+          emoji: '🔥'
+        });
+        syncEditorTrimUI();
+        renderEditorTranscriptUI();
+      });
+
+      // Editor Playback & Trim
+      dom.btnEditorPlayPause.addEventListener('click', () => {
+        if (!state.hasRealVideoElement) return;
+        if (dom.editorSourceVideo.paused) dom.editorSourceVideo.play();
+        else dom.editorSourceVideo.pause();
+      });
+
+      dom.editorSourceVideo.addEventListener('play', () => {
+        dom.iconEditorPlay.setAttribute('data-lucide', 'pause');
+        lucide.createIcons({ root: dom.btnEditorPlayPause });
+      });
+      dom.editorSourceVideo.addEventListener('pause', () => {
+        dom.iconEditorPlay.setAttribute('data-lucide', 'play');
+        lucide.createIcons({ root: dom.btnEditorPlayPause });
+      });
+
+      dom.editSliderIn.addEventListener('input', (e) => {
+        const clip = getActiveClip();
+        if (!clip) return;
+        clip.start = Math.min(Number(e.target.value), clip.end - 2);
+        syncEditorTrimUI();
+        if (state.hasRealVideoElement) dom.editorSourceVideo.currentTime = clip.start;
+      });
+
+      dom.editSliderOut.addEventListener('input', (e) => {
+        const clip = getActiveClip();
+        if (!clip) return;
+        clip.end = Math.max(Number(e.target.value), clip.start + 2);
+        syncEditorTrimUI();
+      });
+
+      dom.btnEditorSafeZone.addEventListener('click', () => {
+        state.showSafeZone = !state.showSafeZone;
+        dom.editorSafeZoneOverlay.classList.toggle('hidden', !state.showSafeZone);
+      });
+
+      // Editor SEO & Export
+      dom.edSeoTitle.addEventListener('input', (e) => {
+        const clip = getActiveClip();
+        if (clip) clip.title = e.target.value;
+      });
+      dom.edSeoDesc.addEventListener('input', (e) => {
+        const clip = getActiveClip();
+        if (clip) clip.description = e.target.value;
+      });
+      dom.edSeoTags.addEventListener('input', (e) => {
+        const clip = getActiveClip();
+        if (clip) clip.hashtags = e.target.value;
+      });
+
+      document.querySelectorAll('.quick-copy-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const el = document.getElementById(btn.dataset.copyEl);
+          if (!el) return;
+          el.select();
+          document.execCommand('copy');
+          showToast('Copiado para a área de transferência!', 'success');
+        });
+      });
+
+      dom.btnEditorExportYoutube.addEventListener('click', () => {
+        const clip = getActiveClip();
+        if (clip) exportClipAndDeliver(clip, true);
+      });
+      dom.btnEditorDownloadOnly.addEventListener('click', () => {
+        const clip = getActiveClip();
+        if (clip) exportClipAndDeliver(clip, false);
+      });
+
+      // Settings Modal
+      dom.btnOpenSettingsModal.addEventListener('click', () => {
+        dom.modalGeminiKeyInput.value = state.geminiKey;
+        dom.modalYtClientIdInput.value = state.ytClientId;
+        dom.settingsModal.classList.remove('hidden');
+      });
+      dom.btnCloseSettingsModal.addEventListener('click', () => dom.settingsModal.classList.add('hidden'));
+      dom.settingsModal.addEventListener('click', (e) => {
+        if (e.target === dom.settingsModal) dom.settingsModal.classList.add('hidden');
+      });
+      dom.btnModalSaveSettings.addEventListener('click', () => {
+        state.geminiKey = dom.modalGeminiKeyInput.value.trim();
+        state.ytClientId = dom.modalYtClientIdInput.value.trim();
+        localStorage.setItem('clipchatt_gemini_key', state.geminiKey);
+        localStorage.setItem('clipchatt_yt_client_id', state.ytClientId);
+        dom.settingsModal.classList.add('hidden');
+        showToast('Configurações salvas!', 'success');
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupEvents();
+      startEditorCanvasLoop();
+    });
+  </script>
+</body>
+</html>
